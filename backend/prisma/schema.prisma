@@ -1,0 +1,201 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  email       String   @unique
+  password    String
+  displayName String
+  bio         String   @default("")
+  avatarUrl   String?
+  bannerUrl   String?
+  isPrivate   Boolean  @default(false)
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  posts     Post[]
+  likes     Like[]
+  reposts   Repost[]
+  bookmarks Bookmark[]
+  pollVotes PollVote[]
+  followers Follow[] @relation("following")
+  following Follow[] @relation("follower")
+
+  pushSubscriptions PushSubscription[]
+
+  notifications       Notification[] @relation("NotificationRecipient")
+  notificationsCaused Notification[] @relation("NotificationActor")
+
+  blocking Block[] @relation("Blocker")
+  blockedBy Block[] @relation("Blocked")
+
+  reports Report[]
+
+  // Post fixado no perfil (opcional)
+  pinnedPostId String?
+  pinnedPost   Post?   @relation("PinnedPost", fields: [pinnedPostId], references: [id], onDelete: SetNull)
+}
+
+model Post {
+  id        String   @id @default(cuid())
+  content   String
+  images    String   @default("[]") // JSON com até 4 URLs de imagem
+  createdAt DateTime @default(now())
+  editedAt  DateTime?
+
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  authorId String
+
+  // Resposta a outro post (comentário)
+  replyToId String?
+  replyTo   Post?   @relation("Replies", fields: [replyToId], references: [id], onDelete: Cascade)
+  replies   Post[]  @relation("Replies")
+
+  // Quote (citação de outro post, com texto próprio)
+  quoteOfId String?
+  quoteOf   Post?   @relation("Quotes", fields: [quoteOfId], references: [id], onDelete: SetNull)
+  quotedBy  Post[]  @relation("Quotes")
+
+  likes     Like[]
+  reposts   Repost[]
+  bookmarks Bookmark[]
+  poll      Poll?
+
+  pinnedBy User[] @relation("PinnedPost")
+}
+
+model Like {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+// Repost puro (sem texto), estilo "retweet"
+model Repost {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+// Post salvo pelo usuário (estilo "salvos" do Twitter)
+model Bookmark {
+  id     String @id @default(cuid())
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, postId])
+}
+
+model Follow {
+  id          String @id @default(cuid())
+  follower    User   @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followerId  String
+  following   User   @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  followingId String
+
+  // false = pedido pendente (perfil privado ainda não aprovou)
+  accepted Boolean @default(true)
+
+  @@unique([followerId, followingId])
+}
+
+// Notificação (curtida, resposta, repost, seguir, menção)
+model Notification {
+  id      String   @id @default(cuid())
+  type    String // "like" | "reply" | "repost" | "follow" | "mention"
+  read    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  recipient   User   @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientId String
+  actor       User   @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+  actorId     String
+
+  // Post relacionado (opcional — segue não tem post)
+  postId String?
+}
+
+// Bloqueio entre usuários
+model Block {
+  id        String   @id @default(cuid())
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blockerId String
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  blockedId String
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+}
+
+// Denúncia de post ou perfil
+model Report {
+  id         String   @id @default(cuid())
+  reporter   User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  reporterId String
+  targetType String // "post" | "user"
+  targetId   String
+  reason     String
+  createdAt  DateTime @default(now())
+}
+// Inscrição de push notification (um navegador/dispositivo por linha)
+model PushSubscription {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+model Poll {
+  id     String @id @default(cuid())
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String @unique
+
+  options PollOption[]
+}
+
+model PollOption {
+  id     String @id @default(cuid())
+  text   String
+  poll   Poll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  pollId String
+
+  votes PollVote[]
+}
+
+model PollVote {
+  id       String     @id @default(cuid())
+  option   PollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionId String
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  postId   String // usado só pra garantir "um voto por post" abaixo
+
+  @@unique([userId, postId])
+}

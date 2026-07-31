@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+/* Camada de "névoa" fixa atrás de tudo: dois brilhos suaves que derivam devagar */
+.aurora-field {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aurora-field::before,
+.aurora-field::after {
+  content: "";
+  position: absolute;
+  width: 60vw;
+  height: 60vw;
+  border-radius: 9999px;
+  filter: blur(90px);
+}
+.aurora-field::before {
+  top: -15%;
+  left: -10%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.22), transparent 70%);
+  animation: drift 18s ease-in-out infinite;
+}
+.aurora-field::after {
+  bottom: -20%;
+  right: -10%;
+  background: radial-gradient(circle, rgba(94, 234, 212, 0.16), transparent 70%);
+  animation: driftReverse 22s ease-in-out infinite;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+
+:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Ativado manualmente em Configurações > Acessibilidade */
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  transition-duration: 0.01ms !important;
+}
+.reduce-motion .aurora-field {
+  display: none;
+}
