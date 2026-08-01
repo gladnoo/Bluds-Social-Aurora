@@ -1,5 +1,20 @@
 import { prisma } from "./prisma.js";
 
+// Tradução automática (inglês -> português), pro conteúdo do Hacker News que
+// vem em inglês. Serviço gratuito, sem chave — se falhar, mantém o texto original.
+async function translateToPortuguese(text) {
+  try {
+    const res = await fetch(
+      `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|pt-BR`
+    );
+    if (!res.ok) return text;
+    const data = await res.json();
+    return data?.responseData?.translatedText || text;
+  } catch {
+    return text;
+  }
+}
+
 // Tenta pegar a imagem de capa (og:image) da página de destino de um link.
 // Melhor esforço só — se falhar ou demorar demais, o post sai sem imagem mesmo.
 async function fetchOgImage(url) {
@@ -47,6 +62,7 @@ async function fetchHackerNews() {
         image: null, // buscado sob demanda, só pro item que for de fato postado
         hashtag: "#tech",
         needsOgImage: true,
+        needsTranslation: true,
       }));
 
     return { items, status: 200 };
@@ -116,8 +132,9 @@ export async function runNewsBot() {
       if (already) continue;
 
       const title = item.title.length > 200 ? `${item.title.slice(0, 197)}...` : item.title;
+      const translatedTitle = item.needsTranslation ? await translateToPortuguese(title) : title;
       // Formato compacto: título, link e hashtag em linhas seguidas, sem espaço em branco extra
-      const content = `${title}\n${item.link}\n${item.hashtag}`.slice(0, 280);
+      const content = `${translatedTitle}\n${item.link}\n${item.hashtag}`.slice(0, 280);
       const imageUrl = item.needsOgImage ? await fetchOgImage(item.link) : item.image;
 
       await prisma.post.create({
