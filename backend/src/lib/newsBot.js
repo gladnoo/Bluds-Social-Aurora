@@ -1,11 +1,34 @@
 import { prisma } from "./prisma.js";
 
+// Tenta pegar a imagem de capa (og:image) da página de destino de um link.
+// Melhor esforço só — se falhar ou demorar demais, o post sai sem imagem mesmo.
+async function fetchOgImage(url) {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 4000);
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; BludsSocialBot/1.0)" },
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+
+    const html = await res.text();
+    const match =
+      html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
+      html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+    return match ? match[1] : null;
+  } catch {
+    return null;
+  }
+}
+
 // Hacker News: 100% público, sem chave, sem bloqueio de servidor.
 async function fetchHackerNews() {
   try {
     const idsRes = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
     if (!idsRes.ok) return { items: [], status: idsRes.status };
-    const ids = (await idsRes.json()).slice(0, 15);
+    const ids = (await idsRes.json()).slice(0, 20);
 
     const raw = await Promise.all(
       ids.map((id) =>
@@ -16,12 +39,14 @@ async function fetchHackerNews() {
     );
 
     const items = raw
-      .filter((p) => p && p.title)
+      // Só títulos com um mínimo de substância — evita coisa tipo "Elevators" sem contexto
+      .filter((p) => p && p.title && p.title.length >= 20 && p.url)
       .map((p) => ({
         title: p.title,
-        link: p.url || `https://news.ycombinator.com/item?id=${p.id}`,
-        image: null,
+        link: p.url,
+        image: null, // buscado sob demanda, só pro item que for de fato postado
         hashtag: "#tech",
+        needsOgImage: true,
       }));
 
     return { items, status: 200 };
@@ -51,6 +76,7 @@ async function fetchTmdbTrending() {
           link: `https://www.themoviedb.org/${kind}/${p.id}`,
           image: image ? `https://image.tmdb.org/t/p/w500${image}` : null,
           hashtag: "#popcultura",
+          needsOgImage: false,
         };
       });
 
@@ -90,12 +116,14 @@ export async function runNewsBot() {
       if (already) continue;
 
       const title = item.title.length > 200 ? `${item.title.slice(0, 197)}...` : item.title;
-      const content = `${title}\n\n${item.link} ${item.hashtag}`.slice(0, 280);
+      // Formato compacto: título, link e hashtag em linhas seguidas, sem espaço em branco extra
+      const content = `${title}\n${item.link}\n${item.hashtag}`.slice(0, 280);
+      const imageUrl = item.needsOgImage ? await fetchOgImage(item.link) : item.image;
 
       await prisma.post.create({
         data: {
           content,
-          images: item.image ? JSON.stringify([item.image]) : "[]",
+          images: imageUrl ? JSON.stringify([imageUrl]) : "[]",
           authorId: bot.id,
         },
       });
