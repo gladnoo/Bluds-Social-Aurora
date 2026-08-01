@@ -97,13 +97,14 @@ model Repost {
   @@unique([userId, postId])
 }
 
-// Post salvo pelo usuário (estilo "salvos" do Twitter)
+// Post salvo pelo usuário (estilo "salvos" do Twitter), organizável em pastas
 model Bookmark {
   id     String @id @default(cuid())
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
   post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId String
+  folder String @default("Geral")
 
   createdAt DateTime @default(now())
 

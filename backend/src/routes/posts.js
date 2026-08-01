@@ -254,12 +254,35 @@ router.get("/user/:username/media", optionalAuth, async (req, res) => {
 
 // Posts salvos pelo usuário logado
 router.get("/bookmarks/me", requireAuth, async (req, res) => {
+  const folder = req.query.folder;
   const bookmarks = await prisma.bookmark.findMany({
-    where: { userId: req.userId },
+    where: { userId: req.userId, ...(folder ? { folder } : {}) },
     orderBy: { createdAt: "desc" },
     include: { post: { include: postInclude } },
   });
-  res.json(bookmarks.map((b) => serializePost(b.post, req.userId)));
+  res.json(bookmarks.map((b) => ({ ...serializePost(b.post, req.userId), bookmarkFolder: b.folder })));
+});
+
+// Lista as pastas de salvos que o usuário já criou (só os nomes distintos)
+router.get("/bookmarks/folders", requireAuth, async (req, res) => {
+  const rows = await prisma.bookmark.findMany({
+    where: { userId: req.userId },
+    select: { folder: true },
+    distinct: ["folder"],
+  });
+  res.json(rows.map((r) => r.folder));
+});
+
+// Move um post salvo pra outra pasta
+router.patch("/:id/bookmark/folder", requireAuth, async (req, res) => {
+  const { folder } = req.body;
+  const bookmark = await prisma.bookmark.findUnique({
+    where: { userId_postId: { userId: req.userId, postId: req.params.id } },
+  });
+  if (!bookmark) return res.status(404).json({ error: "Esse post não está salvo" });
+
+  await prisma.bookmark.update({ where: { id: bookmark.id }, data: { folder: folder?.trim() || "Geral" } });
+  res.json({ ok: true });
 });
 
 // Detalhe de um post + suas respostas (thread)
@@ -287,8 +310,9 @@ router.get("/:id", optionalAuth, async (req, res) => {
 
 // Criar post — texto, resposta, quote, até 4 imagens e/ou enquete (multipart/form-data)
 router.post("/", requireAuth, upload.array("images", 4), async (req, res) => {
-  const { content, replyToId, quoteOfId, pollOptions } = req.body;
+  const { content, replyToId, quoteOfId, pollOptions, gifUrl } = req.body;
   const files = req.files || [];
+  const validGif = typeof gifUrl === "string" && /^https:\/\//.test(gifUrl) ? gifUrl : null;
 
   let parsedOptions = [];
   if (pollOptions) {
@@ -300,7 +324,7 @@ router.post("/", requireAuth, upload.array("images", 4), async (req, res) => {
   }
   const hasPoll = parsedOptions.length >= 2;
 
-  if ((!content || !content.trim()) && files.length === 0 && !hasPoll) {
+  if ((!content || !content.trim()) && files.length === 0 && !hasPoll && !validGif) {
     return res.status(400).json({ error: "O post não pode estar vazio" });
   }
   if (content && content.length > 280) {
@@ -322,7 +346,7 @@ router.post("/", requireAuth, upload.array("images", 4), async (req, res) => {
   const post = await prisma.post.create({
     data: {
       content: content || "",
-      images: "[]",
+      images: validGif ? JSON.stringify([validGif]) : "[]",
       authorId: req.userId,
       replyToId: replyToId || null,
       quoteOfId: quoteOfId || null,
@@ -456,7 +480,8 @@ router.post("/:id/bookmark", requireAuth, async (req, res) => {
   } else {
     const post = await prisma.post.findUnique({ where: { id: postId } });
     if (!post) return res.status(404).json({ error: "Post não encontrado" });
-    await prisma.bookmark.create({ data: { userId: req.userId, postId } });
+    const folder = req.body?.folder?.trim() || "Geral";
+    await prisma.bookmark.create({ data: { userId: req.userId, postId, folder } });
   }
 
   const post = await prisma.post.findUnique({ where: { id: postId }, include: postInclude });

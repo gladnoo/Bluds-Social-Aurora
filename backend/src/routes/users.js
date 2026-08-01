@@ -6,6 +6,7 @@ import { requireAuth, optionalAuth } from "../middleware/auth.js";
 import { isBlocked } from "../lib/blocks.js";
 import { notify } from "../lib/notifications.js";
 import { uploadToStorage } from "../lib/supabase.js";
+import { computeBadges } from "../lib/badges.js";
 
 function extOf(filename) {
   const dot = filename.lastIndexOf(".");
@@ -118,11 +119,15 @@ router.get("/:username", optionalAuth, async (req, res) => {
   const user = await prisma.user.findUnique({ where: { username: req.params.username } });
   if (!user) return res.status(404).json({ error: "Usuário não encontrado" });
 
-  const [postsCount, followersCount, followingCount] = await Promise.all([
+  const [postsCount, followersCount, followingCount, totalLikesReceived] = await Promise.all([
     prisma.post.count({ where: { authorId: user.id, replyToId: null } }),
     prisma.follow.count({ where: { followingId: user.id, accepted: true } }),
     prisma.follow.count({ where: { followerId: user.id, accepted: true } }),
+    prisma.like.count({ where: { post: { authorId: user.id } } }),
   ]);
+
+  const accountAgeDays = Math.floor((Date.now() - new Date(user.createdAt).getTime()) / 86400000);
+  const badges = computeBadges({ postsCount, followersCount, totalLikesReceived, accountAgeDays });
 
   let followedByMe = false;
   let pending = false;
@@ -147,6 +152,7 @@ router.get("/:username", optionalAuth, async (req, res) => {
     pending,
     blockedByMe,
     canSeePosts,
+    badges,
     _count: { posts: postsCount, followers: followersCount, following: followingCount },
   });
 });
