@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { IconCamera, IconLock, IconSettings, IconFlag, IconVerified } from "../components/Icons.jsx";
 import ImageCropModal from "../components/ImageCropModal.jsx";
 import ReportModal from "../components/ReportModal.jsx";
+import BadgeRow from "../components/BadgeRow.jsx";
 import { resolveImageUrl } from "../lib/media.js";
 
 const TABS = [
@@ -299,6 +300,7 @@ export default function Profile() {
               </div>
               <p className="text-hush">@{profile.username}</p>
               {profile.bio && <p className="mt-2 leading-relaxed">{profile.bio}</p>}
+              <BadgeRow badges={profile.badges} />
               {profile._count && (
                 <div className="flex gap-4 mt-3 text-sm text-hush">
                   <span>

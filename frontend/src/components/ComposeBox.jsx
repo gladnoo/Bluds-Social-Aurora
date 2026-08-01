@@ -3,8 +3,9 @@ import { motion } from "framer-motion";
 import Avatar from "./Avatar.jsx";
 import api from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
-import { IconImage, IconX, IconChart, IconSmile } from "./Icons.jsx";
+import { IconImage, IconX, IconChart, IconSmile, IconPlus, IconGif } from "./Icons.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
+import GifPicker from "./GifPicker.jsx";
 import MentionDropdown from "./MentionDropdown.jsx";
 import { useMentionAutocomplete } from "../lib/useMentionAutocomplete.js";
 import { compressImage } from "../lib/compressImage.js";
@@ -22,6 +23,9 @@ export default function ComposeBox({ onPosted }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [threadParts, setThreadParts] = useState([]); // string[] — posts extras encadeados
+  const [selectedGif, setSelectedGif] = useState(null); // URL do GIF (Tenor)
+  const [gifPickerOpen, setGifPickerOpen] = useState(false);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
   const { suggestions, showDropdown, selectMention } = useMentionAutocomplete(content, setContent, textareaRef);
@@ -54,6 +58,8 @@ export default function ComposeBox({ onPosted }) {
   async function handlePickImages(e) {
     const files = Array.from(e.target.files || []).slice(0, 4 - images.length);
     if (files.length === 0) return;
+    setSelectedGif(null);
+    setShowPoll(false);
     // Mostra a prévia (original) na hora, e comprime em segundo plano antes do envio
     setPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))].slice(0, 4));
     const compressed = await Promise.all(files.map((f) => compressImage(f)));
@@ -79,10 +85,31 @@ export default function ComposeBox({ onPosted }) {
       setImages([]);
       setPreviews([]);
     }
+    setSelectedGif(null);
+  }
+
+  function handleSelectGif(url) {
+    setSelectedGif(url);
+    setGifPickerOpen(false);
+    setImages([]);
+    setPreviews([]);
+    setShowPoll(false);
   }
 
   const validPollOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
-  const canSubmit = content.trim() || images.length > 0 || (showPoll && validPollOptions.length >= 2);
+  const canSubmit = content.trim() || images.length > 0 || !!selectedGif || (showPoll && validPollOptions.length >= 2);
+
+  function addThreadPart() {
+    if (threadParts.length < 9) setThreadParts((prev) => [...prev, ""]);
+  }
+
+  function updateThreadPart(index, value) {
+    setThreadParts((prev) => prev.map((t, i) => (i === index ? value : t)));
+  }
+
+  function removeThreadPart(index) {
+    setThreadParts((prev) => prev.filter((_, i) => i !== index));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -93,20 +120,37 @@ export default function ComposeBox({ onPosted }) {
       const formData = new FormData();
       formData.append("content", content);
       images.forEach((img) => formData.append("images", img));
+      if (selectedGif) formData.append("gifUrl", selectedGif);
       if (showPoll && validPollOptions.length >= 2) {
         formData.append("pollOptions", JSON.stringify(validPollOptions));
       }
 
-      const { data } = await api.post("/api/posts", formData, {
+      const { data: firstPost } = await api.post("/api/posts", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
+
+      // Publica cada parte extra do fio, uma respondendo a anterior
+      let previousId = firstPost.id;
+      const parts = threadParts.map((t) => t.trim()).filter(Boolean);
+      for (const part of parts) {
+        const partForm = new FormData();
+        partForm.append("content", part);
+        partForm.append("replyToId", previousId);
+        const { data: nextPost } = await api.post("/api/posts", partForm, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        previousId = nextPost.id;
+      }
+
       setContent("");
       localStorage.removeItem(DRAFT_KEY);
       setImages([]);
       setPreviews([]);
       setShowPoll(false);
       setPollOptions(["", ""]);
-      onPosted?.(data);
+      setThreadParts([]);
+      setSelectedGif(null);
+      onPosted?.(firstPost);
     } catch (err) {
       setError(err.response?.data?.error || "Erro ao publicar");
     } finally {
@@ -161,6 +205,19 @@ export default function ComposeBox({ onPosted }) {
             </div>
           )}
 
+          {selectedGif && (
+            <div className="relative mb-3 mt-1 rounded-2xl overflow-hidden border border-mist-border inline-block">
+              <img src={selectedGif} alt="GIF selecionado" className="max-h-48 rounded-2xl" />
+              <button
+                type="button"
+                onClick={() => setSelectedGif(null)}
+                className="absolute top-1.5 right-1.5 bg-mist/80 backdrop-blur p-1 rounded-full text-ghost"
+              >
+                <IconX size={14} />
+              </button>
+            </div>
+          )}
+
           {showPoll && (
             <div className="mb-3 mt-1 p-3 rounded-2xl border border-mist-border flex flex-col gap-2">
               {pollOptions.map((opt, i) => (
@@ -196,14 +253,40 @@ export default function ComposeBox({ onPosted }) {
             </div>
           )}
 
-          {error && <p className="text-bloom text-sm mb-2">{error}</p>}
+          {threadParts.map((part, i) => (
+            <div key={i} className="mt-3 pt-3 border-t border-dashed border-mist-border flex gap-2">
+              <span className="text-hush text-xs mt-2.5 w-4 flex-shrink-0">{i + 2}</span>
+              <div className="flex-1">
+                <textarea
+                  value={part}
+                  onChange={(e) => updateThreadPart(i, e.target.value)}
+                  placeholder="Continue o fio..."
+                  maxLength={280}
+                  rows={2}
+                  className="w-full bg-transparent outline-none resize-none text-base placeholder-hush"
+                />
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-hush">{part.length}/280</span>
+                  <button
+                    type="button"
+                    onClick={() => removeThreadPart(i)}
+                    className="text-hush hover:text-bloom text-xs flex items-center gap-1"
+                  >
+                    <IconX size={12} /> Remover
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {error && <p className="text-bloom text-sm mb-2 mt-2">{error}</p>}
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                disabled={showPoll || images.length >= 4}
+                disabled={showPoll || images.length >= 4 || !!selectedGif}
                 className="text-aurora-soft hover:text-aurora p-2 rounded-full hover:bg-mist-hover transition-colors disabled:opacity-30"
                 title="Adicionar imagem"
               >
@@ -217,10 +300,24 @@ export default function ComposeBox({ onPosted }) {
                 className="hidden"
                 onChange={handlePickImages}
               />
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setGifPickerOpen((v) => !v)}
+                  disabled={showPoll || images.length > 0}
+                  className={`p-2 rounded-full hover:bg-mist-hover transition-colors disabled:opacity-30 ${
+                    selectedGif ? "text-aurora" : "text-aurora-soft hover:text-aurora"
+                  }`}
+                  title="Adicionar GIF"
+                >
+                  <IconGif size={19} />
+                </button>
+                {gifPickerOpen && <GifPicker onSelect={handleSelectGif} onClose={() => setGifPickerOpen(false)} />}
+              </div>
               <button
                 type="button"
                 onClick={togglePoll}
-                disabled={images.length > 0}
+                disabled={images.length > 0 || !!selectedGif}
                 className={`p-2 rounded-full hover:bg-mist-hover transition-colors disabled:opacity-30 ${
                   showPoll ? "text-aurora" : "text-aurora-soft hover:text-aurora"
                 }`}
@@ -239,6 +336,15 @@ export default function ComposeBox({ onPosted }) {
                 </button>
                 {emojiOpen && <EmojiPicker onSelect={insertEmoji} onClose={() => setEmojiOpen(false)} />}
               </div>
+              <button
+                type="button"
+                onClick={addThreadPart}
+                disabled={threadParts.length >= 9}
+                className="text-aurora-soft hover:text-aurora p-2 rounded-full hover:bg-mist-hover transition-colors disabled:opacity-30"
+                title="Adicionar ao fio"
+              >
+                <IconPlus size={19} />
+              </button>
               <span className="text-xs text-hush ml-1">
                 {content.length}/280{content.trim() && !busy ? " · rascunho salvo" : ""}
               </span>
@@ -249,7 +355,7 @@ export default function ComposeBox({ onPosted }) {
               disabled={!canSubmit || busy}
               className="bg-gradient-to-r from-aurora to-aurora-teal disabled:opacity-40 disabled:cursor-not-allowed text-mist font-bold px-5 py-2 rounded-full transition-opacity hover:opacity-90"
             >
-              Postar
+              {busy ? "Postando..." : threadParts.length > 0 ? `Postar fio (${threadParts.length + 1})` : "Postar"}
             </button>
           </div>
         </div>

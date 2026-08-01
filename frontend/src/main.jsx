@@ -5,6 +5,9 @@ import App from "./App.jsx";
 import { AuthProvider } from "./context/AuthContext.jsx";
 import { NotificationsProvider } from "./context/NotificationsContext.jsx";
 import "./index.css";
+import { applyAccentTheme, getSavedAccentTheme } from "./lib/accentThemes.js";
+
+applyAccentTheme(getSavedAccentTheme());
 
 if (localStorage.getItem("bluds_reduce_motion") === "1") {
   document.body.classList.add("reduce-motion");

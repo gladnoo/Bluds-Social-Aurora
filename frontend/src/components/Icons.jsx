@@ -279,6 +279,17 @@ export function IconVerified({ size = 16, className = "" }) {
   );
 }
 
+export function IconGif({ size = 20, className = "" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" className={className} {...base}>
+      <rect x="3" y="6" width="18" height="12" rx="3" />
+      <text x="12" y="14.5" fontSize="7" fontWeight="700" textAnchor="middle" fill="currentColor" stroke="none">
+        GIF
+      </text>
+    </svg>
+  );
+}
+
 export function BlurLogoMark({ size = 22, className = "" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className={className}>

@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Cor de destaque padrão (tema "Aurora"). Trocável em Configurações > Aparência. */
+  --color-aurora: 167 139 250; /* #a78bfa */
+  --color-aurora-soft: 196 181 253; /* #c4b5fd */
+  --color-aurora-teal: 94 234 212; /* #5eead4 */
+}
+
 html, body, #root {
   height: 100%;
 }

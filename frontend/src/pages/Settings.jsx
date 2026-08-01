@@ -5,6 +5,8 @@ import Avatar from "../components/Avatar.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { IconLock, IconGlobe, IconLogOut } from "../components/Icons.jsx";
 import { isPushSupported, getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from "../lib/push.js";
+import { ACCENT_THEMES, getSavedAccentTheme, saveAccentTheme } from "../lib/accentThemes.js";
+import { IconCheck } from "../components/Icons.jsx";
 
 function Section({ title, children }) {
   return (
@@ -249,6 +251,42 @@ function DataSection() {
   );
 }
 
+function AppearanceSection() {
+  const [current, setCurrent] = useState(getSavedAccentTheme());
+
+  function pick(id) {
+    saveAccentTheme(id);
+    setCurrent(id);
+  }
+
+  return (
+    <Section title="Aparência">
+      <p className="text-sm text-hush mb-3">Escolha a cor de destaque do app.</p>
+      <div className="flex gap-3 flex-wrap">
+        {ACCENT_THEMES.map((theme) => (
+          <button
+            key={theme.id}
+            onClick={() => pick(theme.id)}
+            className="flex flex-col items-center gap-1.5"
+            title={theme.name}
+          >
+            <span
+              className="w-11 h-11 rounded-full flex items-center justify-center border-2 transition-colors"
+              style={{
+                background: `linear-gradient(135deg, ${theme.swatch[0]}, ${theme.swatch[1]})`,
+                borderColor: current === theme.id ? theme.swatch[0] : "transparent",
+              }}
+            >
+              {current === theme.id && <IconCheck size={16} className="text-mist" />}
+            </span>
+            <span className="text-xs text-hush">{theme.name}</span>
+          </button>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 function PushSection() {
   const [status, setStatus] = useState("checking"); // checking | unsupported | subscribed | unsubscribed
   const [busy, setBusy] = useState(false);
@@ -372,6 +410,7 @@ export default function Settings() {
 
       <AccountSection user={user} updateUser={updateUser} />
       <PrivacySection user={user} updateUser={updateUser} />
+      <AppearanceSection />
       <PushSection />
       <AccessibilitySection />
       <DataSection />

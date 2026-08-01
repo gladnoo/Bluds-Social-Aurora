@@ -11,11 +11,12 @@ export default {
           hover: "rgba(255,255,255,0.085)",
           border: "rgba(255,255,255,0.11)",
         },
-        // Gradiente principal (aurora): violeta -> verde-água suave
+        // Gradiente principal (aurora): violeta -> verde-água suave por padrão,
+        // mas trocável em Configurações > Aparência (usa CSS variables por baixo)
         aurora: {
-          DEFAULT: "#a78bfa",
-          soft: "#c4b5fd",
-          teal: "#5eead4",
+          DEFAULT: "rgb(var(--color-aurora) / <alpha-value>)",
+          soft: "rgb(var(--color-aurora-soft) / <alpha-value>)",
+          teal: "rgb(var(--color-aurora-teal) / <alpha-value>)",
         },
         // Destaque secundário: rosa suave, usado em curtidas
         bloom: {
@@ -30,7 +31,7 @@ export default {
         sans: ["'Plus Jakarta Sans'", "sans-serif"],
       },
       boxShadow: {
-        aurora: "0 0 0 1px rgba(167,139,250,0.35), 0 0 28px rgba(94,234,212,0.18)",
+        aurora: "0 0 0 1px rgb(var(--color-aurora) / 0.35), 0 0 28px rgb(var(--color-aurora-teal) / 0.18)",
         bloom: "0 0 0 1px rgba(244,114,182,0.35), 0 0 20px rgba(244,114,182,0.18)",
         card: "0 4px 24px rgba(10,8,20,0.25)",
       },
