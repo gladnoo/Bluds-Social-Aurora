@@ -13,9 +13,12 @@ async function fetchTopPosts(subreddit) {
   const res = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?limit=8&t=day`, {
     headers: { "User-Agent": "BludsSocialBot/1.0 (noticias automaticas)" },
   });
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.error(`[newsBot] Falha ao buscar r/${subreddit}: HTTP ${res.status}`);
+    return { posts: [], status: res.status };
+  }
   const data = await res.json();
-  return (data?.data?.children || []).map((c) => c.data);
+  return { posts: (data?.data?.children || []).map((c) => c.data), status: 200 };
 }
 
 function extractImage(post) {
@@ -39,12 +42,15 @@ export async function runNewsBot() {
   if (!bot) return { posted: 0, reason: "Usuário do bot não encontrado" };
 
   let posted = 0;
+  const debug = [];
   const shuffledSources = [...SOURCES].sort(() => Math.random() - 0.5);
 
   for (const source of shuffledSources) {
     if (posted >= 2) break; // no máximo 2 posts por disparo, pra não lotar o feed
 
-    const posts = await fetchTopPosts(source.subreddit);
+    const { posts, status } = await fetchTopPosts(source.subreddit);
+    let postedFromThisSource = false;
+
     for (const p of posts) {
       if (p.stickied || p.over_18) continue;
 
@@ -66,9 +72,12 @@ export async function runNewsBot() {
         },
       });
       posted++;
+      postedFromThisSource = true;
       break; // 1 notícia por fonte nessa rodada
     }
+
+    debug.push({ subreddit: source.subreddit, httpStatus: status, foundPosts: posts.length, posted: postedFromThisSource });
   }
 
-  return { posted };
+  return { posted, debug };
 }
