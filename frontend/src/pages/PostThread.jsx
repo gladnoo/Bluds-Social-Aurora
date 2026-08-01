@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import api from "../api.js";
@@ -8,6 +8,8 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { IconArrowLeft } from "../components/Icons.jsx";
 import Poll from "../components/Poll.jsx";
 import Lightbox from "../components/Lightbox.jsx";
+import MentionDropdown from "../components/MentionDropdown.jsx";
+import { useMentionAutocomplete } from "../lib/useMentionAutocomplete.js";
 import { renderContentWithHashtags } from "../lib/text.jsx";
 import { resolveImageUrl } from "../lib/media.js";
 
@@ -25,6 +27,8 @@ function ReplyBox({ postId, onReplied }) {
   const [focused, setFocused] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const textareaRef = useRef(null);
+  const { suggestions, showDropdown, selectMention } = useMentionAutocomplete(content, setContent, textareaRef);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -70,8 +74,9 @@ function ReplyBox({ postId, onReplied }) {
     >
       <div className="flex gap-3">
         <Avatar user={user} />
-        <div className="flex-1">
+        <div className="flex-1 relative">
           <textarea
+            ref={textareaRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
             onFocus={() => setFocused(true)}
@@ -81,6 +86,7 @@ function ReplyBox({ postId, onReplied }) {
             rows={2}
             className="w-full bg-transparent outline-none resize-none text-lg placeholder-hush"
           />
+          {showDropdown && <MentionDropdown suggestions={suggestions} onSelect={selectMention} />}
           {error && <p className="text-bloom text-sm mb-2">{error}</p>}
           <div className="flex items-center justify-between">
             <span className="text-xs text-hush">{content.length}/280</span>

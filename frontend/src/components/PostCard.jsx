@@ -6,6 +6,8 @@ import QuoteModal from "./QuoteModal.jsx";
 import ReportModal from "./ReportModal.jsx";
 import Poll from "./Poll.jsx";
 import Lightbox from "./Lightbox.jsx";
+import MentionDropdown from "./MentionDropdown.jsx";
+import { useMentionAutocomplete } from "../lib/useMentionAutocomplete.js";
 import api from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { renderContentWithHashtags } from "../lib/text.jsx";
@@ -96,6 +98,9 @@ export default function PostCard({ post, onChange, repostedBy = null, pinned = f
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(post.content);
+  const editTextareaRef = useRef(null);
+  const { suggestions: editSuggestions, showDropdown: showEditDropdown, selectMention: selectEditMention } =
+    useMentionAutocomplete(editContent, setEditContent, editTextareaRef);
   const [busyEdit, setBusyEdit] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -313,15 +318,17 @@ export default function PostCard({ post, onChange, repostedBy = null, pinned = f
           </div>
 
           {editing ? (
-            <div onClick={(e) => e.stopPropagation()} className="mt-1">
+            <div onClick={(e) => e.stopPropagation()} className="mt-1 relative">
               <textarea
                 autoFocus
+                ref={editTextareaRef}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 maxLength={280}
                 rows={3}
                 className="w-full bg-mist border border-mist-border rounded-xl p-2.5 outline-none focus:border-aurora/50 resize-none"
               />
+              {showEditDropdown && <MentionDropdown suggestions={editSuggestions} onSelect={selectEditMention} />}
               <div className="flex items-center gap-2 mt-2">
                 <button
                   onClick={saveEdit}

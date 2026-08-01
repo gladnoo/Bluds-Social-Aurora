@@ -1,15 +1,19 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { motion } from "framer-motion";
 import Avatar from "./Avatar.jsx";
 import api from "../api.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { IconX } from "./Icons.jsx";
+import MentionDropdown from "./MentionDropdown.jsx";
+import { useMentionAutocomplete } from "../lib/useMentionAutocomplete.js";
 
 export default function QuoteModal({ post, onClose, onQuoted }) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const textareaRef = useRef(null);
+  const { suggestions, showDropdown, selectMention } = useMentionAutocomplete(content, setContent, textareaRef);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -57,9 +61,10 @@ export default function QuoteModal({ post, onClose, onQuoted }) {
         <form onSubmit={handleSubmit} className="p-4">
           <div className="flex gap-3">
             <Avatar user={user} />
-            <div className="flex-1">
+            <div className="flex-1 relative">
               <textarea
                 autoFocus
+                ref={textareaRef}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="Adicione um comentário!"
@@ -67,6 +72,7 @@ export default function QuoteModal({ post, onClose, onQuoted }) {
                 rows={3}
                 className="w-full bg-transparent outline-none resize-none text-lg placeholder-hush"
               />
+              {showDropdown && <MentionDropdown suggestions={suggestions} onSelect={selectMention} />}
 
               <div className="border border-mist-border rounded-2xl p-3 mb-2">
                 <div className="flex items-center gap-2">
