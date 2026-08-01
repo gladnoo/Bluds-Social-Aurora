@@ -1,39 +1,67 @@
 import { prisma } from "./prisma.js";
 
-// Fontes públicas (API JSON do Reddit, sem precisar de chave nenhuma).
-// Pode adicionar/trocar subreddits livremente aqui.
-const SOURCES = [
-  { subreddit: "worldnews", hashtag: "#noticias" },
-  { subreddit: "popculturechat", hashtag: "#popcultura" },
-  { subreddit: "technology", hashtag: "#tech" },
-  { subreddit: "todayilearned", hashtag: "#curiosidades" },
-];
-
-async function fetchTopPosts(subreddit) {
-  const res = await fetch(`https://www.reddit.com/r/${subreddit}/top.json?limit=8&t=day`, {
-    headers: { "User-Agent": "BludsSocialBot/1.0 (noticias automaticas)" },
-  });
-  if (!res.ok) {
-    console.error(`[newsBot] Falha ao buscar r/${subreddit}: HTTP ${res.status}`);
-    return { posts: [], status: res.status };
-  }
-  const data = await res.json();
-  return { posts: (data?.data?.children || []).map((c) => c.data), status: 200 };
-}
-
-function extractImage(post) {
+// Hacker News: 100% público, sem chave, sem bloqueio de servidor.
+async function fetchHackerNews() {
   try {
-    const src = post.preview?.images?.[0]?.source?.url;
-    if (src) return src.replace(/&amp;/g, "&");
+    const idsRes = await fetch("https://hacker-news.firebaseio.com/v0/topstories.json");
+    if (!idsRes.ok) return { items: [], status: idsRes.status };
+    const ids = (await idsRes.json()).slice(0, 15);
+
+    const raw = await Promise.all(
+      ids.map((id) =>
+        fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+          .then((r) => r.json())
+          .catch(() => null)
+      )
+    );
+
+    const items = raw
+      .filter((p) => p && p.title)
+      .map((p) => ({
+        title: p.title,
+        link: p.url || `https://news.ycombinator.com/item?id=${p.id}`,
+        image: null,
+        hashtag: "#tech",
+      }));
+
+    return { items, status: 200 };
   } catch {
-    // sem preview disponível, tenta o thumbnail abaixo
+    return { items: [], status: 0 };
   }
-  if (post.thumbnail && post.thumbnail.startsWith("http")) return post.thumbnail;
-  return null;
 }
 
-// Busca notícias novas e posta na conta do bot. Evita repetir a mesma notícia
-// checando se o link já apareceu num post anterior do bot.
+// TMDB: filmes/séries/famosos em alta — ótimo pra "mundo pop".
+// Precisa de uma chave grátis (TMDB_API_KEY). Se não configurar, essa fonte é ignorada.
+async function fetchTmdbTrending() {
+  const key = process.env.TMDB_API_KEY;
+  if (!key) return { items: [], status: 0, skipped: true };
+
+  try {
+    const res = await fetch(`https://api.themoviedb.org/3/trending/all/day?api_key=${key}&language=pt-BR`);
+    if (!res.ok) return { items: [], status: res.status };
+    const data = await res.json();
+
+    const items = (data.results || [])
+      .filter((p) => p.title || p.name)
+      .map((p) => {
+        const kind = p.media_type === "tv" ? "tv" : p.media_type === "person" ? "person" : "movie";
+        const image = p.poster_path || p.profile_path;
+        return {
+          title: p.title || p.name,
+          link: `https://www.themoviedb.org/${kind}/${p.id}`,
+          image: image ? `https://image.tmdb.org/t/p/w500${image}` : null,
+          hashtag: "#popcultura",
+        };
+      });
+
+    return { items, status: 200 };
+  } catch {
+    return { items: [], status: 0 };
+  }
+}
+
+// Busca notícias/conteúdo novo e posta na conta do bot. Evita repetir o mesmo
+// link checando se ele já apareceu num post anterior do bot.
 export async function runNewsBot() {
   const botUsername = process.env.BOT_USERNAME;
   if (!botUsername) return { posted: 0, reason: "BOT_USERNAME não configurado" };
@@ -41,42 +69,42 @@ export async function runNewsBot() {
   const bot = await prisma.user.findUnique({ where: { username: botUsername } });
   if (!bot) return { posted: 0, reason: "Usuário do bot não encontrado" };
 
+  const sources = [
+    { name: "hackernews", fetcher: fetchHackerNews },
+    { name: "tmdb", fetcher: fetchTmdbTrending },
+  ].sort(() => Math.random() - 0.5);
+
   let posted = 0;
   const debug = [];
-  const shuffledSources = [...SOURCES].sort(() => Math.random() - 0.5);
 
-  for (const source of shuffledSources) {
+  for (const source of sources) {
     if (posted >= 2) break; // no máximo 2 posts por disparo, pra não lotar o feed
 
-    const { posts, status } = await fetchTopPosts(source.subreddit);
+    const { items, status, skipped } = await source.fetcher();
     let postedFromThisSource = false;
 
-    for (const p of posts) {
-      if (p.stickied || p.over_18) continue;
-
-      const link = p.url_overridden_by_dest || `https://reddit.com${p.permalink}`;
+    for (const item of items) {
       const already = await prisma.post.findFirst({
-        where: { authorId: bot.id, content: { contains: link } },
+        where: { authorId: bot.id, content: { contains: item.link } },
       });
       if (already) continue;
 
-      const title = p.title.length > 200 ? `${p.title.slice(0, 197)}...` : p.title;
-      const content = `${title}\n\n${link} ${source.hashtag}`.slice(0, 280);
-      const imageUrl = extractImage(p);
+      const title = item.title.length > 200 ? `${item.title.slice(0, 197)}...` : item.title;
+      const content = `${title}\n\n${item.link} ${item.hashtag}`.slice(0, 280);
 
       await prisma.post.create({
         data: {
           content,
-          images: imageUrl ? JSON.stringify([imageUrl]) : "[]",
+          images: item.image ? JSON.stringify([item.image]) : "[]",
           authorId: bot.id,
         },
       });
       posted++;
       postedFromThisSource = true;
-      break; // 1 notícia por fonte nessa rodada
+      break; // 1 item por fonte nessa rodada
     }
 
-    debug.push({ subreddit: source.subreddit, httpStatus: status, foundPosts: posts.length, posted: postedFromThisSource });
+    debug.push({ source: source.name, httpStatus: status, skipped: !!skipped, foundItems: items.length, posted: postedFromThisSource });
   }
 
   return { posted, debug };
