@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api.js";
 import Avatar from "../components/Avatar.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
-import { IconLock, IconGlobe } from "../components/Icons.jsx";
+import { IconLock, IconGlobe, IconLogOut } from "../components/Icons.jsx";
 import { isPushSupported, getPushSubscriptionStatus, subscribeToPush, unsubscribeFromPush } from "../lib/push.js";
 
 function Section({ title, children }) {
@@ -351,12 +351,23 @@ export default function Settings() {
     }
   }
 
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
+
   if (!user) return null;
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10">
+      <div className="p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10 flex items-center justify-between">
         <h1 className="font-display italic font-semibold text-2xl">Configurações</h1>
+        <button
+          onClick={handleLogout}
+          className="flex items-center gap-2 text-bloom text-sm font-semibold border border-bloom/30 hover:bg-bloom/10 px-3 py-1.5 rounded-full transition-colors"
+        >
+          <IconLogOut size={15} /> Sair
+        </button>
       </div>
 
       <AccountSection user={user} updateUser={updateUser} />
