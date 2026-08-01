@@ -48,6 +48,8 @@ function ImageGrid({ images }) {
             key={i}
             src={resolveImageUrl(url)}
             alt=""
+            loading="lazy"
+            decoding="async"
             onClick={(e) => {
               e.stopPropagation();
               setZoomIndex(i);

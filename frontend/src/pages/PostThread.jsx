@@ -141,7 +141,7 @@ export default function PostThread() {
 
   return (
     <div>
-      <div className="flex items-center gap-4 p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10">
+      <div className="flex items-center gap-4 p-4 sticky top-0 bg-mist/80 backdrop-blur-sm z-10">
         <button onClick={() => navigate(-1)} className="text-hush hover:text-ghost p-1.5 rounded-full">
           <IconArrowLeft size={20} />
         </button>
@@ -175,6 +175,8 @@ export default function PostThread() {
                 key={i}
                 src={resolveImageUrl(url)}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 onClick={() => setZoomIndex(i)}
                 className={`w-full object-cover border border-mist-border cursor-zoom-in ${post.images.length === 1 ? "max-h-[28rem]" : "h-48"}`}
               />

@@ -7,6 +7,7 @@ import { IconImage, IconX, IconChart, IconSmile } from "./Icons.jsx";
 import EmojiPicker from "./EmojiPicker.jsx";
 import MentionDropdown from "./MentionDropdown.jsx";
 import { useMentionAutocomplete } from "../lib/useMentionAutocomplete.js";
+import { compressImage } from "../lib/compressImage.js";
 
 const DRAFT_KEY = "bluds_draft";
 
@@ -50,11 +51,13 @@ export default function ComposeBox({ onPosted }) {
     });
   }
 
-  function handlePickImages(e) {
+  async function handlePickImages(e) {
     const files = Array.from(e.target.files || []).slice(0, 4 - images.length);
     if (files.length === 0) return;
-    setImages((prev) => [...prev, ...files].slice(0, 4));
+    // Mostra a prévia (original) na hora, e comprime em segundo plano antes do envio
     setPreviews((prev) => [...prev, ...files.map((f) => URL.createObjectURL(f))].slice(0, 4));
+    const compressed = await Promise.all(files.map((f) => compressImage(f)));
+    setImages((prev) => [...prev, ...compressed].slice(0, 4));
   }
 
   function removeImage(index) {

@@ -21,7 +21,7 @@ export default function Hashtag() {
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10">
+      <div className="p-4 sticky top-0 bg-mist/80 backdrop-blur-sm z-10">
         <h1 className="font-display italic font-semibold text-2xl">#{tag}</h1>
       </div>
 

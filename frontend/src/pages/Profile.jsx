@@ -159,14 +159,14 @@ export default function Profile() {
 
   return (
     <div>
-      <div className="p-4 pb-2 sticky top-0 bg-mist/70 backdrop-blur-lg z-10">
+      <div className="p-4 pb-2 sticky top-0 bg-mist/80 backdrop-blur-sm z-10">
         <h1 className="font-display italic font-semibold text-2xl">{profile.displayName}</h1>
       </div>
 
       <div className="mx-4 mb-4 rounded-3xl bg-mist-surface border border-mist-border overflow-hidden">
         <div className="relative h-32 bg-gradient-to-br from-aurora/25 to-aurora-teal/20">
           {profile.bannerUrl && (
-            <img src={resolveImageUrl(profile.bannerUrl)} alt="" className="w-full h-full object-cover" />
+            <img src={resolveImageUrl(profile.bannerUrl)} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />
           )}
           {isMe && (
             <button

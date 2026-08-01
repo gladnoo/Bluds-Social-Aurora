@@ -30,7 +30,7 @@ export default function Search() {
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10">
+      <div className="p-4 sticky top-0 bg-mist/80 backdrop-blur-sm z-10">
         <h1 className="font-display italic font-semibold text-2xl mb-3">Buscar</h1>
         <div className="flex items-center gap-2 bg-mist-surface border border-mist-border rounded-full px-4 py-2.5">
           <IconSearch size={18} className="text-hush" />

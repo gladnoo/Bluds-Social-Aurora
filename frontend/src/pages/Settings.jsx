@@ -360,7 +360,7 @@ export default function Settings() {
 
   return (
     <div>
-      <div className="p-4 sticky top-0 bg-mist/70 backdrop-blur-lg z-10 flex items-center justify-between">
+      <div className="p-4 sticky top-0 bg-mist/80 backdrop-blur-sm z-10 flex items-center justify-between">
         <h1 className="font-display italic font-semibold text-2xl">Configurações</h1>
         <button
           onClick={handleLogout}

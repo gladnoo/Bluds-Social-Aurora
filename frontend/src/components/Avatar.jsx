@@ -14,7 +14,7 @@ export default function Avatar({ user, size = "w-10 h-10", ring = true }) {
   const src = resolveImageUrl(user?.avatarUrl);
 
   const inner = src ? (
-    <img src={src} alt={user.displayName} className={`${size} rounded-full object-cover block`} />
+    <img src={src} alt={user.displayName} loading="lazy" decoding="async" className={`${size} rounded-full object-cover block`} />
   ) : (
     <div className={`${size} rounded-full bg-mist-surface flex items-center justify-center text-hush flex-shrink-0`}>
       <IconUser size={16} />
